@@ -1,0 +1,14 @@
+{
+  "name": "careerpilot-staging",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist/staging",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  },
+  "build": {
+    "command": "node scripts/build-staging.mjs"
+  }
+}

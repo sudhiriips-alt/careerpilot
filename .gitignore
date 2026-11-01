@@ -1,0 +1,6 @@
+# Generated local/staging artifacts only
+/dist/
+/.wrangler/
+/node_modules/
+/firestore-debug.log
+/tests/__pycache__/
