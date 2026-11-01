@@ -41,18 +41,19 @@ $('view').addEventListener('submit',e=>{if(e.target.id==='chatForm'){e.preventDe
 $('exportBtn').onclick=()=>{const choice=prompt('Export format: type JSON for complete backup or CSV for spreadsheet use.','JSON');if(choice===null)return;if(choice.trim().toUpperCase()==='CSV')exportCSV();else exportJSON()};
 if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 // Login gate: do not render or write personal records without an authenticated user.
-let profileData={}, resumeData={};let authMode='login';
+let profileData={}, resumeData={};let authMode='login';let authGeneration=0;
 function gate(message){$('authGate').hidden=false;document.querySelector('.shell').style.display='none';$('authMessage').textContent=message||'Sign in to securely access your jobs, profile and resumes.'}
 function showWorkspace(){document.querySelector('.shell').style.display='flex';$('authGate').hidden=true;$('signOutBtn').hidden=false;go('overview')}
 window.addEventListener('career-auth',async e=>{
- const {user,configured,error}=e.detail;
+ const {user,configured,error}=e.detail;const authRun=++authGeneration;
+ jobs=[];profileData={};resumeData={};
  if(!configured){gate('Firebase setup is required before registration works. Follow FIREBASE_SETUP.md to connect your project.');$('authForm').hidden=true;$('googleAuth').hidden=true;return}
  if(!user){jobs=[];profileData={};resumeData={};$('signOutBtn').hidden=true;gate(error||'Sign in to your private CareerPilot workspace.');return}
  gate('Loading your private workspace…');try{
  const result=await Promise.all([CareerCloud.read('jobs'),CareerCloud.read('profile'),CareerCloud.read('resume')]);
- if(CareerCloud.user?.uid!==user.uid)return;
+ if(authRun!==authGeneration||CareerCloud.user?.uid!==user.uid)return;
  jobs=Array.isArray(result[0])?result[0]:[];profileData=result[1]&&typeof result[1]==='object'?result[1]:{};resumeData=result[2]&&typeof result[2]==='object'?result[2]:{};showWorkspace();
- }catch(err){gate('Could not load account data: '+err.message+' — check Firestore rules and connectivity.')}});
+ }catch(err){if(authRun!==authGeneration)return;gate('Could not load account data: '+err.message+' — check Firestore rules and connectivity.')}});
 $('authForm').addEventListener('submit',async e=>{e.preventDefault();let email=$('authEmail').value.trim(),password=$('authPassword').value;try{$('authMessage').textContent='Authenticating…';if(authMode==='signup')await CareerCloud.signup(email,password);else await CareerCloud.login(email,password)}catch(e){$('authMessage').textContent=e.message}});
 $('switchAuth').onclick=()=>{authMode=authMode==='signup'?'login':'signup';$('authHeading').textContent=authMode==='signup'?'Create your account':'Sign in';$('switchAuth').textContent=authMode==='signup'?'Already have an account?':'Create account';$('authMessage').textContent='Use an email address you control.'};
 $('forgotAuth').onclick=async()=>{const email=$('authEmail').value.trim();if(!email){$('authMessage').textContent='Enter your email address first.';return}try{await CareerCloud.reset(email);$('authMessage').textContent='If this email has an account, check your inbox for reset instructions.'}catch(err){$('authMessage').textContent=err.message}};
@@ -72,7 +73,7 @@ const originalProfileView=profileView,originalResumeView=resumeView;
 profileView=()=>importEntry()+originalProfileView();resumeView=()=>importEntry()+originalResumeView();
 function closeImport(){importGeneration++;importDialog.close();importDialog.replaceChildren()}
 window.addEventListener('career-auth',closeImport);
-importDialog.addEventListener('cancel',e=>{e.preventDefault();closeImport()});
+importDialog.addEventListener('cancel',e=>{e.preventDefault();if(!$('cancelImport')?.disabled)closeImport()});
 $('view').addEventListener('click',e=>{if(e.target.closest('[data-import-resume]'))openImport()});
 function openImport(){
  if(!CareerCloud.user){toast('Sign in required');return}
@@ -93,8 +94,9 @@ function openImport(){
    }).join('');
    $('importReview').innerHTML=`<details><summary>Extracted text (check reading order)</summary><pre class="extractedText">${esc(draft.text)}</pre></details><p>Mapping is based on contact patterns and section headings. Review every suggestion. Unchecked fields stay unchanged; a selected empty field clears its value.</p><form id="importApproval">${controls}<label><input type="checkbox" id="approveImport" required> I reviewed these fields and approve updating my profile and resume.</label><button class="button primary" type="submit">Approve and save selected fields</button></form>`;
    $('importStatus').textContent='Ready for review. No data has been changed.';
+   let saving=false;
    $('importApproval').onsubmit=async event=>{
-    event.preventDefault();if(!$('approveImport').checked)return;
+    event.preventDefault();if(saving||!$('approveImport').checked)return;
     if(run!==importGeneration||CareerCloud.user?.uid!==uid){closeImport();return}
     const form=event.currentTarget,profile={...profileData},resume={...resumeData};let selected=0;
     for(const key of Object.keys(ResumeImport.fields))if(form.elements[`select-${key}`].checked){
@@ -104,12 +106,14 @@ function openImport(){
      selected++;
     }
     if(!selected){$('importStatus').textContent='Select at least one field to apply.';return}
-    const button=form.querySelector('button');button.disabled=true;$('importStatus').textContent='Saving approved fields…';
+    saving=true;
+    // A submitted batch cannot be cancelled; keep the approved snapshot visible until it settles.
+    for(const control of importDialog.querySelectorAll('input,textarea,button'))control.disabled=true;$('importStatus').textContent='Saving approved fields…';
     try{
      await CareerCloud.importResume(profile,resume,uid);
      if(run!==importGeneration||CareerCloud.user?.uid!==uid)return;
      profileData=profile;resumeData=resume;closeImport();render();toast('Approved resume fields saved');
-    }catch(err){if(run===importGeneration){$('importStatus').textContent='Import was not saved: '+err.message;button.disabled=false}}
+    }catch(err){if(run===importGeneration){$('importStatus').textContent='Import was not saved: '+err.message;saving=false;for(const control of importDialog.querySelectorAll('input,textarea,button'))control.disabled=false}}
    };
   }catch(err){if(run===importGeneration)$('importStatus').textContent='Could not import: '+err.message}
   finally{if(run===importGeneration)$('resumeFile').disabled=false}

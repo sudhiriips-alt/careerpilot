@@ -4,7 +4,7 @@ Open **My profile** or **Resume builder**, choose **Upload PDF / DOCX**, and sel
 
 Mapping recognizes a first-line name, contact details, explicit `Location:` / `Headline:` / `Title:` labels, and Summary, Experience, Education, Skills, Projects and Certifications headings. It does not infer qualifications or job preferences. Review the extracted text and editable suggestions. Each checkbox identifies which profile/resume fields it updates and shows existing values. Unselected fields are preserved; selecting an empty value clears that field. Approval is required before saving. Profile-only preferences and existing jobs remain untouched.
 
-Approved profile and resume values are committed together in an authenticated Firestore batch under `users/{uid}/workspace/{profile,resume}`, using existing security rules. Failed saves leave in-memory data unchanged and permit retry. Authentication changes discard the import draft; the write helper rejects an unexpected current UID. Drafts are not stored in localStorage. No Firebase project settings or rules were changed.
+Approved profile and resume values are committed together in an authenticated Firestore batch under `users/{uid}/workspace/{profile,resume}`, using existing security rules. Failed saves leave in-memory data unchanged and permit retry. Authentication changes discard the import draft; the write helper rejects an unexpected current UID. Drafts are not stored in localStorage. Controls and cancellation are locked while an approved batch is pending. Authentication changes discard the UI draft but cannot retract an already approved, submitted batch. No Firebase project settings or rules were changed.
 
 ## Local validation
 
@@ -17,7 +17,7 @@ python3 -m http.server 8000 --bind 127.0.0.1
 In another terminal:
 
 ```sh
-node --test tests/cloud_import_test.cjs
+node --test tests/cloud_import_test.cjs tests/auth_race_test.cjs
 python3 tests/resume_import_test.py
 ```
 
@@ -25,7 +25,7 @@ The browser test requires Python Playwright and `/usr/bin/chromium`, available i
 
 ## Integration checks still required
 
-The environment denies Firebase SDK loading from `www.gstatic.com`; real authentication and Firestore tests remain blocked. The tests above do not establish production Firebase readiness. After permitted network access and authorized test accounts are available, verify:
+On 2 November 2026 the SDK URL was reachable. Real Firebase integration is unverified: authorized test-account sessions are unavailable and Chromium startup is blocked by the environment. Firestore emulator tests passed. See PREMERGE_VALIDATION.md. The tests above do not establish production Firebase readiness. After permitted network access and authorized test accounts are available, verify:
 
 - Existing email/password and Google authentication, job CRUD, profile editing and resume printing.
 - Import approval followed by reload and a second-device read of profile/resume.
