@@ -61,3 +61,57 @@ $('signOutBtn').onclick=()=>CareerCloud.logout().catch(err=>toast(err.message));
 $('view').addEventListener('submit',async e=>{if(!['profileForm','resumeForm'].includes(e.target.id))return;e.preventDefault();const form=e.target;const next=Object.fromEntries(new FormData(form).entries());const name=form.id==='profileForm'?'profile':'resume';try{await CareerCloud.write(name,next);if(name==='profile')profileData=next;else resumeData=next;toast(name==='profile'?'Profile saved':'Resume saved');render()}catch(err){toast('Save failed: '+err.message)}});
 $('view').addEventListener('click',e=>{if(e.target.id==='printResume')window.print()});
 if(!CareerCloud?.configured)gate('Firebase setup is required before registration works. Follow FIREBASE_SETUP.md to connect your project.');else gate('Checking your sign-in status…');
+
+// Import drafts are session-only and are discarded when authentication changes.
+let importGeneration=0;
+const importDialog=document.createElement('dialog');
+importDialog.id='resumeImportDialog';importDialog.setAttribute('aria-labelledby','importTitle');
+document.body.append(importDialog);
+function importEntry(){return '<section class="panel importEntry"><h2>Import your resume</h2><p>Extract text from a PDF or DOCX on this device, then review and approve fields before saving.</p><button type="button" class="button ghost" data-import-resume>Upload PDF / DOCX</button></section>'}
+const originalProfileView=profileView,originalResumeView=resumeView;
+profileView=()=>importEntry()+originalProfileView();resumeView=()=>importEntry()+originalResumeView();
+function closeImport(){importGeneration++;importDialog.close();importDialog.replaceChildren()}
+window.addEventListener('career-auth',closeImport);
+importDialog.addEventListener('cancel',e=>{e.preventDefault();closeImport()});
+$('view').addEventListener('click',e=>{if(e.target.closest('[data-import-resume]'))openImport()});
+function openImport(){
+ if(!CareerCloud.user){toast('Sign in required');return}
+ closeImport();const uid=CareerCloud.user.uid;
+ importDialog.innerHTML=`<div class="importBody"><h2 id="importTitle">Import resume</h2><p>PDF or DOCX, up to 5 MB. Text-based PDFs only (no OCR). The file stays on this device. Only approved fields are saved to your account.</p><label>Resume file<input id="resumeFile" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label><p id="importStatus" role="status" aria-live="polite"></p><div id="importReview"></div><button type="button" class="button ghost" id="cancelImport">Cancel</button></div>`;
+ importDialog.showModal();$('cancelImport').onclick=closeImport;
+ $('resumeFile').onchange=async e=>{
+  const file=e.target.files[0];if(!file)return;
+  const run=++importGeneration;e.target.disabled=true;$('importReview').replaceChildren();$('importStatus').textContent='Extracting text…';
+  try{
+   const draft=await ResumeImport.extract(file);
+   if(run!==importGeneration||CareerCloud.user?.uid!==uid)return;
+   const profileMap={fullName:'fullName',headline:'headline',location:'location',phone:'phone',website:'website',skills:'skills'};
+   const resumeMap={fullName:'name',email:'email',phone:'phone',location:'location',headline:'headline',summary:'summary',experience:'experience',education:'education',skills:'skills',projects:'projects',certifications:'certifications'};
+   const controls=Object.entries(ResumeImport.fields).map(([key,label])=>{
+    const destinations=[profileMap[key]?'profile':'',resumeMap[key]?'resume':''].filter(Boolean).join(' and ');
+    return `<div class="importField"><label><input type="checkbox" name="select-${key}" ${draft.values[key]?'checked':''}> Apply ${esc(label)} to ${destinations}</label><label>Reviewed ${esc(label)}<textarea name="value-${key}" maxlength="20000" rows="3">${esc(draft.values[key]||'')}</textarea></label><small>Current profile: ${esc(profileMap[key]?profileData[profileMap[key]]||'(empty)':'—')}<br>Current resume: ${esc(resumeMap[key]?resumeData[resumeMap[key]]||'(empty)':'—')}</small></div>`;
+   }).join('');
+   $('importReview').innerHTML=`<details><summary>Extracted text (check reading order)</summary><pre class="extractedText">${esc(draft.text)}</pre></details><p>Mapping is based on contact patterns and section headings. Review every suggestion. Unchecked fields stay unchanged; a selected empty field clears its value.</p><form id="importApproval">${controls}<label><input type="checkbox" id="approveImport" required> I reviewed these fields and approve updating my profile and resume.</label><button class="button primary" type="submit">Approve and save selected fields</button></form>`;
+   $('importStatus').textContent='Ready for review. No data has been changed.';
+   $('importApproval').onsubmit=async event=>{
+    event.preventDefault();if(!$('approveImport').checked)return;
+    if(run!==importGeneration||CareerCloud.user?.uid!==uid){closeImport();return}
+    const form=event.currentTarget,profile={...profileData},resume={...resumeData};let selected=0;
+    for(const key of Object.keys(ResumeImport.fields))if(form.elements[`select-${key}`].checked){
+     const value=form.elements[`value-${key}`].value.trim();
+     if(profileMap[key])profile[profileMap[key]]=value;
+     if(resumeMap[key])resume[resumeMap[key]]=value;
+     selected++;
+    }
+    if(!selected){$('importStatus').textContent='Select at least one field to apply.';return}
+    const button=form.querySelector('button');button.disabled=true;$('importStatus').textContent='Saving approved fields…';
+    try{
+     await CareerCloud.importResume(profile,resume,uid);
+     if(run!==importGeneration||CareerCloud.user?.uid!==uid)return;
+     profileData=profile;resumeData=resume;closeImport();render();toast('Approved resume fields saved');
+    }catch(err){if(run===importGeneration){$('importStatus').textContent='Import was not saved: '+err.message;button.disabled=false}}
+   };
+  }catch(err){if(run===importGeneration)$('importStatus').textContent='Could not import: '+err.message}
+  finally{if(run===importGeneration)$('resumeFile').disabled=false}
+ };
+}
