@@ -1,0 +1,1 @@
+{"name":"CareerPilot — Job Search Workspace","short_name":"CareerPilot","description":"A local-first job application tracker and job search workspace","start_url":"./index.html","scope":"./","display":"standalone","background_color":"#f5f7fb","theme_color":"#172b50","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
