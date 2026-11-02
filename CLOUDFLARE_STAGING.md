@@ -6,11 +6,33 @@ Prepared 2 November 2026. Branch `feat/resume-document-import`, existing PR #1. 
 
 Use Workers Static Assets, with no Worker entry-point script, rather than legacy Workers Sites or a Pages deployment. `wrangler.staging.json` targets **careerpilot-staging** only, with no routes/custom domains/account ID and no named environments. Both workers.dev and version URLs are enabled. A custom build copies an explicit public-file allowlist into `dist/staging`; never use the repository root as `assets.directory`.
 
-The existing production Worker `careerpilot` and GitHub Pages are not deployment targets. There is no default Wrangler config or new deployment workflow. Do not run a bare `npx wrangler deploy`, change the staging name to `careerpilot`, attach production routes, or edit the existing production Worker's build settings.
+The existing production Worker `careerpilot` and GitHub Pages are not deployment targets. There is no default Wrangler config. The GitHub Actions staging workflow is manual-only; commits, pull requests and merges do not trigger it. Do not run a bare `npx wrangler deploy`, change the staging name to `careerpilot`, attach production routes, or edit the existing production Worker's build settings.
 
 The app changes views in JavaScript without client-side path routing. Consequently `not_found_handling: none` is intentional: a missing script must return 404, not index.html. Normal HTML canonical redirects are allowed. The staging-only `_headers` source disables search indexing, revalidates assets and sets no-store for sw.js/Firebase config. Local Firebase configuration is copied byte-for-byte; it is public Web SDK configuration, not an admin credential. Vendor parser files and their licenses are included.
 
-## Safe staging action
+## Manual GitHub Actions workflow
+
+`.github/workflows/deploy-staging.yml` is the cloud-terminal-free deployment path. It has only `workflow_dispatch`, no inputs for worker names/routes/commands, read-only GitHub contents permission, SHA-pinned checkout/setup-node actions, exact-commit checkout without persisted GitHub credentials, a 20-minute timeout and serialized staging runs. It targets only `careerpilot-staging` using the existing staging config and build script. Repository/event/ref guards are enforced at job entry, before checkout and again immediately before deployment. Runs from main, tags, forks and automatic events are rejected or skipped.
+
+The workflow builds, runs the three existing Node approval/auth/batch tests plus the two staging package checks, installs Wrangler **4.156.0** without Cloudflare secrets, performs a non-uploading dry-run, and runs local Wrangler HTTP asset-serving checks before deployment. Only the final deploy step receives the two Cloudflare secrets. Wrangler's configured custom build runs again during deployment; it is the same reviewed allowlisted copy script. No third-party deploy action, production route, Firebase setting change or rule deployment is used. Emulator/browser/real-Firebase integration checks remain separate pre-merge gates; this workflow does not claim to run them.
+
+### One-time setup by the repository/account owner
+
+1. In the correct Cloudflare account, create a deployment API token with only the Workers permissions needed for Static Assets. Prefer an existing-Worker resource scope limited to `careerpilot-staging` when available. If initial Worker creation requires broader access, use separately authorized provisioning; do not silently broaden a staging token to production resources. Do not use a global API key. Record that account's account ID.
+2. In `sudhiriips-alt/careerpilot` → **Settings → Environments**, create an environment named **staging**. Set its deployment branch rule to **Selected branches and tags**, add a **branch** rule exactly `feat/resume-document-import`, and do not add a tag rule. Add a required reviewer / prevent self-review if supported and desired for manual release authorization. Review access to this feature branch and the workflow before granting the token.
+3. Under that environment's **Environment secrets**, add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. These are GitHub Actions secrets, accessed via `secrets.*`. Repository Actions secrets with those same names also work, but environment-scoped secrets provide a narrower boundary. Never place either value in YAML, commits, issues, logs, frontend code or chat. This task did not create, inspect or change secrets or environment settings.
+4. **Activation blocker:** GitHub only accepts `workflow_dispatch` for a workflow file registered on the repository's default branch, currently `main`. This feature-branch-only commit cannot by itself make the Run workflow button available. A separately reviewed/authorized workflow-only addition of the same file to main is needed; **do not merge PR #1 to activate staging**. No default-branch change was made here. A CLI/API `--ref feat/resume-document-import` dispatch does not remove GitHub's default-branch registration requirement.
+5. Once registration and secret setup are authorized/completed, go to **Actions → Deploy CareerPilot staging (manual) → Run workflow**, select **feat/resume-document-import**, and run it manually. Its feature-branch guard rejects a main-branch deployment even though main registers the workflow. An authorized repository writer must initiate it; environment approval may also be required. No workflow dispatch was performed in this task.
+
+The explicit ref checks are in-workflow safety guards, not a claim that repository branch-protection rules were configured. Environment branch rules and any reviewer requirement are one-time owner settings. Cloudflare token scope is the credential boundary; workflow checks cannot protect an account-wide token from someone authorized to rewrite trusted branch code.
+
+### Validation of the workflow change
+
+Locally passed: actionlint 1.7.7; YAML/trigger/permission/secret-scope checks; shell guard cases for the allowed branch and denied main/tag/push/fork contexts; missing-secret refusal; five Node tests; Wrangler 4.156.0 dry-run; and the workflow's actual local HTTP-serving shell step. No GitHub-hosted Actions run or remote deploy was initiated. Secrets, environment restrictions and Cloudflare authorization remain unverified owner setup.
+
+References: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow and https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/.
+
+## Safe staging action (alternative cloud terminal)
 
 From this branch in the repository root, in a Cloudflare-authenticated cloud terminal/account:
 
