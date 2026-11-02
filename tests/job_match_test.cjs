@@ -1,0 +1,5 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const {analyze,tokens}=require('../job-match.js');
+test('reports grounded vocabulary coverage and unmatched terms',()=>{const r=analyze('Seeking a monitoring evaluation researcher with sampling, fieldwork and dashboard analysis experience.','Experienced monitoring researcher with sampling and dashboard analysis.');assert.ok(r.matched.includes('sampling'));assert.ok(r.missing.includes('fieldwork'));assert.ok(r.coverage>=0&&r.coverage<=100);});
+test('does not hallucinate missing qualifications',()=>{const r=analyze('Requires quantitative research, Stata, Python, survey planning and team management.','Worked on survey planning.');assert.ok(r.missing.includes('python'));assert.ok(r.missing.includes('stata'));});
+test('requires sufficient description and user evidence',()=>{assert.throws(()=>analyze('small text','some resume'));assert.throws(()=>analyze('This opportunity requires experience in research and administration.',''));});
+test('unique tokenization and case normalization',()=>{assert.deepEqual(tokens('Python python PYTHON'),['python']);});
