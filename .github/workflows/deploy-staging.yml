@@ -25,7 +25,6 @@ jobs:
       github.ref == 'refs/heads/feat/resume-document-import'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    environment: staging
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -104,7 +103,7 @@ jobs:
           test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
           test "$GITHUB_REF" = 'refs/heads/feat/resume-document-import'
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo '::error::Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the staging environment secrets.'
+            echo '::error::Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the repository Actions secrets. No deployment was attempted.'
             exit 1
           fi
           node "$RUNNER_TEMP/careerpilot-wrangler/node_modules/wrangler/bin/wrangler.js" deploy \
