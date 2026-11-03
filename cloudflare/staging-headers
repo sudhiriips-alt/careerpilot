@@ -1,0 +1,9 @@
+/*
+  Cache-Control: no-cache
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, nofollow
+/sw.js
+  Cache-Control: no-store
+  Service-Worker-Allowed: /
+/firebase-config.js
+  Cache-Control: no-store

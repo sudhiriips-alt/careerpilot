@@ -1,0 +1,21 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const vm=require('node:vm');
+const fs=require('node:fs');
+test('import uses an atomic batch scoped to the authenticated user',async()=>{
+ const writes=[];let commits=0;
+ const auth={currentUser:{uid:'alice'},onAuthStateChanged(fn){fn(this.currentUser)}};
+ const db={collection:n=>({doc:uid=>({collection:scope=>({doc:name=>`${n}/${uid}/${scope}/${name}`})})}),batch:()=>({set:(path,data)=>writes.push({path,data}),commit:async()=>{commits++}})};
+ const firebase={initializeApp(){},auth:()=>auth,firestore:Object.assign(()=>db,{FieldValue:{serverTimestamp:()=> 'timestamp'}})};
+ const window={CAREERPILOT_FIREBASE_CONFIG:{apiKey:'public',projectId:'test'},dispatchEvent(){}};
+ vm.runInNewContext(fs.readFileSync('cloud.js','utf8'),{window,firebase,CustomEvent:class {},console});
+ const api=window.CareerCloud;
+ await api.importResume({fullName:'Reviewed'},{name:'Reviewed'},'alice');
+ assert.equal(commits,1);assert.deepEqual(writes.map(w=>w.path),['users/alice/workspace/profile','users/alice/workspace/resume']);
+ assert.equal(writes[0].data.value.fullName,'Reviewed');
+ auth.currentUser={uid:'bob'};
+ await assert.rejects(api.importResume({}, {}, 'alice'),/sign-in changed/);
+ assert.equal(commits,1);
+ auth.currentUser=null;await assert.rejects(api.importResume({}, {}, 'alice'),/sign-in changed/);
+ assert.equal(commits,1);
+});

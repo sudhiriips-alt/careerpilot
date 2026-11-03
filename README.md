@@ -11,3 +11,5 @@ Responsive browser / installable PWA with:
 This is a development-stage foundation. It is **not yet a commercially certified product**, and does not claim real AI matching or a live jobs feed. Do not collect real user data until production security validation and policy requirements are complete.
 
 To deploy: update `firebase-config.js`, publish `firestore.rules` in Firebase console, and upload the project files into the root of the GitHub Pages repository (with `index.html` at root). No Android Studio or local build required.
+
+Resume upload supports local PDF/DOCX text extraction with editable, explicitly approved profile/resume updates. See [resume import workflow and validation](RESUME_IMPORT.md).
