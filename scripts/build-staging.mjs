@@ -8,7 +8,7 @@ if(config.name!=='careerpilot-staging'||config.assets?.directory!=='./dist/stagi
    config.main||config.routes||config.route||config.env||config.account_id||config.zone_id||
    config.workers_dev!==true||config.preview_urls!==true)throw Error('Unsafe staging configuration');
 const files=[
- 'index.html','app.js','cloud.js','resume-import.js','styles.css','sw.js',
+ 'index.html','app.js','cloud.js','resume-import.js','job-match.js','styles.css','sw.js',
  'firebase-config.js','icon.svg','manifest.webmanifest',
  'vendor/mammoth.browser.min.js','vendor/pdf.mjs','vendor/pdf.worker.mjs',
  'vendor/mammoth-LICENSE','vendor/pdfjs-LICENSE'

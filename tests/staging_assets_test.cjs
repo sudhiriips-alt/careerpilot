@@ -21,7 +21,7 @@ test('staging isolation and public asset references',()=>{
  const sw=read('sw.js');const precache=sw.match(/const ASSETS=(\[[^;]+\])/)[1];
  for(const asset of JSON.parse(precache.replaceAll("'",'"')))if(asset!=='./')publicFile(asset);
  for(const match of read('resume-import.js').matchAll(/['"]\.\/(vendor\/[^'"]+)['"]/g))publicFile(match[1]);
- for(const file of ['app.js','cloud.js','resume-import.js','sw.js','firebase-config.js'])new vm.Script(read(file));
+ for(const file of ['app.js','cloud.js','resume-import.js','job-match.js','sw.js','firebase-config.js'])new vm.Script(read(file));
  assert.match(read('_headers'),/X-Robots-Tag: noindex, nofollow/);
  assert.match(read('_headers'),/Service-Worker-Allowed: \//);
 });
@@ -30,7 +30,7 @@ test('staging package excludes source/configuration/test/secret files and preser
  function walk(dir,prefix=''){for(const item of fs.readdirSync(dir,{withFileTypes:true})){
   const name=prefix+item.name;if(item.isDirectory())walk(path.join(dir,item.name),name+'/');else entries.push(name);
  }}walk(out);
- assert.equal(entries.length,15);
+ assert.equal(entries.length,16);
  for(const file of entries){
   assert.ok(!/(^|\/)(\.|tests|scripts)|\.md$|firestore|firebase\.json|wrangler/.test(file),file);
   if(file!=='_headers')assert.deepEqual(fs.readFileSync(path.join(out,file)),fs.readFileSync(path.join(root,file)),file);
